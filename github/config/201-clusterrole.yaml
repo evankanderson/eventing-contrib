@@ -83,12 +83,18 @@ rules:
   - configmaps
   verbs: *everything
 
-# EventTypes admin
+# Namespace labelling for webhook
 - apiGroups:
-  - eventing.knative.dev
+  - ""
   resources:
-  - eventtypes
-  verbs: *everything
+  - namespaces
+  verbs:
+  - get
+  - create
+  - update
+  - list
+  - watch
+  - patch
 
 - apiGroups:
   - coordination.k8s.io

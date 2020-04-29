@@ -37,6 +37,7 @@ fi
 
 # Eventing main config path from HEAD.
 readonly EVENTING_CONFIG="${GOPATH}/src/knative.dev/eventing/config/"
+readonly EVENTING_CHANNEL_BROKER_CONFIG="${GOPATH}/src/knative.dev/eventing/config/brokers/channel-broker"
 
 # Vendored eventing test iamges.
 readonly VENDOR_EVENTING_TEST_IMAGES="vendor/knative.dev/eventing/test/test_images/"
@@ -49,7 +50,7 @@ readonly NATSS_INSTALLATION_CONFIG="natss/config/broker/natss.yaml"
 readonly NATSS_CRD_CONFIG_DIR="natss/config"
 
 # Strimzi installation config template used for starting up Kafka clusters.
-readonly STRIMZI_INSTALLATION_CONFIG_TEMPLATE="test/config/100-strimzi-cluster-operator-0.16.2.yaml"
+readonly STRIMZI_INSTALLATION_CONFIG_TEMPLATE="test/config/100-strimzi-cluster-operator-0.17.0.yaml"
 # Strimzi installation config.
 readonly STRIMZI_INSTALLATION_CONFIG="$(mktemp)"
 # Kafka cluster CR config file.
@@ -83,6 +84,8 @@ function knative_setup() {
     git clone https://github.com/knative/eventing
     popd
     ko apply -f ${EVENTING_CONFIG}
+    # Install Channel Based Broker
+    ko apply -f ${EVENTING_CHANNEL_BROKER_CONFIG}
   fi
   wait_until_pods_running knative-eventing || fail_test "Knative Eventing did not come up"
 
@@ -105,6 +108,20 @@ function knative_teardown() {
   wait_until_object_does_not_exist namespaces knative-eventing
 }
 
+# Add function call to trap
+# Parameters: $1 - Function to call
+#             $2...$n - Signals for trap
+function add_trap() {
+  local cmd=$1
+  shift
+  for trap_signal in $@; do
+    local current_trap="$(trap -p $trap_signal | cut -d\' -f2)"
+    local new_cmd="($cmd)"
+    [[ -n "${current_trap}" ]] && new_cmd="${current_trap};${new_cmd}"
+    trap -- "${new_cmd}" $trap_signal
+  done
+}
+
 function test_setup() {
   natss_setup || return 1
   kafka_setup || return 1
@@ -112,6 +129,17 @@ function test_setup() {
 
   install_channel_crds || return 1
   install_sources_crds || return 1
+
+  # Install kail if needed.
+  if ! which kail > /dev/null; then
+    bash <( curl -sfL https://raw.githubusercontent.com/boz/kail/master/godownloader.sh) -b "$GOPATH/bin"
+  fi
+
+  # Capture all logs.
+  kail > ${ARTIFACTS}/k8s.log.txt &
+  local kail_pid=$!
+  # Clean up kail so it doesn't interfere with job shutting down
+  add_trap "kill $kail_pid || true" EXIT
 
   # Publish test images.
   echo ">> Publishing test images from vendor"
@@ -216,6 +244,8 @@ initialize $@ --skip-istio-addon
 # TODO: Figure out why kafka channels do not like parallel=12 (which it was)
 # https://github.com/knative/eventing-contrib/issues/917
 go_test_e2e -timeout=20m -parallel=1 ./test/e2e -channels=messaging.knative.dev/v1alpha1:NatssChannel,messaging.knative.dev/v1alpha1:KafkaChannel  || fail_test
+
+go_test_e2e -timeout=5m -parallel=2 ./test/conformance -channels=messaging.knative.dev/v1alpha1:NatssChannel,messaging.knative.dev/v1alpha1:KafkaChannel  || fail_test
 
 # If you wish to use this script just as test setup, *without* teardown, just uncomment this line and comment all go_test_e2e commands
 # trap - SIGINT SIGQUIT SIGTSTP EXIT

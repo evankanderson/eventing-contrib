@@ -11,9 +11,17 @@ aliases:
 
   github-approvers:
     - lberk
+    - mattmoor
   github-reviewers:
     - lberk
     - rootfs
+
+  gitlab-approvers:
+    - sebgoa
+    - tzununbekov
+  gitlab-reviewers:
+    - sebgoa
+    - tzununbekov
 
   kafka-approvers:
     - lberk

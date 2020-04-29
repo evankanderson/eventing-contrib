@@ -37,6 +37,7 @@ import (
 	flowsv1alpha1 "knative.dev/eventing/pkg/apis/flows/v1alpha1"
 	messagingv1alpha1 "knative.dev/eventing/pkg/apis/messaging/v1alpha1"
 	sourcesv1alpha1 "knative.dev/eventing/pkg/apis/sources/v1alpha1"
+	sourcesv1alpha2 "knative.dev/eventing/pkg/apis/sources/v1alpha2"
 	fakeeventingclientset "knative.dev/eventing/pkg/client/clientset/versioned/fake"
 	configslisters "knative.dev/eventing/pkg/client/listers/configs/v1alpha1"
 	eventinglisters "knative.dev/eventing/pkg/client/listers/eventing/v1alpha1"
@@ -44,6 +45,8 @@ import (
 	flowslisters "knative.dev/eventing/pkg/client/listers/flows/v1alpha1"
 	messaginglisters "knative.dev/eventing/pkg/client/listers/messaging/v1alpha1"
 	sourcelisters "knative.dev/eventing/pkg/client/listers/sources/v1alpha1"
+	sourcev1alpha2listers "knative.dev/eventing/pkg/client/listers/sources/v1alpha2"
+	duckv1 "knative.dev/pkg/apis/duck/v1"
 	"knative.dev/pkg/reconciler/testing"
 )
 
@@ -52,11 +55,17 @@ var subscriberAddToScheme = func(scheme *runtime.Scheme) error {
 	return nil
 }
 
+var sourceAddToScheme = func(scheme *runtime.Scheme) error {
+	scheme.AddKnownTypeWithName(schema.GroupVersionKind{Group: "testing.sources.knative.dev", Version: "v1alpha1", Kind: "TestSource"}, &duckv1.Source{})
+	return nil
+}
+
 var clientSetSchemes = []func(*runtime.Scheme) error{
 	fakekubeclientset.AddToScheme,
 	fakeeventingclientset.AddToScheme,
 	fakeapiextensionsclientset.AddToScheme,
 	subscriberAddToScheme,
+	sourceAddToScheme,
 }
 
 type Listers struct {
@@ -153,6 +162,26 @@ func (l *Listers) GetApiServerSourceLister() sourcelisters.ApiServerSourceLister
 
 func (l *Listers) GetPingSourceLister() sourcelisters.PingSourceLister {
 	return sourcelisters.NewPingSourceLister(l.indexerFor(&sourcesv1alpha1.PingSource{}))
+}
+
+func (l *Listers) GetSinkBindingLister() sourcelisters.SinkBindingLister {
+	return sourcelisters.NewSinkBindingLister(l.indexerFor(&sourcesv1alpha1.SinkBinding{}))
+}
+
+func (l *Listers) GetPingSourceV1alpha2Lister() sourcev1alpha2listers.PingSourceLister {
+	return sourcev1alpha2listers.NewPingSourceLister(l.indexerFor(&sourcesv1alpha2.PingSource{}))
+}
+
+func (l *Listers) GetContainerSourceLister() sourcev1alpha2listers.ContainerSourceLister {
+	return sourcev1alpha2listers.NewContainerSourceLister(l.indexerFor(&sourcesv1alpha2.ContainerSource{}))
+}
+
+func (l *Listers) GetSinkBindingV1alpha2Lister() sourcev1alpha2listers.SinkBindingLister {
+	return sourcev1alpha2listers.NewSinkBindingLister(l.indexerFor(&sourcesv1alpha2.SinkBinding{}))
+}
+
+func (l *Listers) GetApiServerSourceV1alpha2Lister() sourcev1alpha2listers.ApiServerSourceLister {
+	return sourcev1alpha2listers.NewApiServerSourceLister(l.indexerFor(&sourcesv1alpha2.ApiServerSource{}))
 }
 
 func (l *Listers) GetDeploymentLister() appsv1listers.DeploymentLister {

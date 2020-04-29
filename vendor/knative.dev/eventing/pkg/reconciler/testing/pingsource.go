@@ -20,9 +20,12 @@ import (
 	"context"
 	"time"
 
+	"knative.dev/eventing/pkg/apis/eventing"
+
 	"knative.dev/eventing/pkg/apis/sources/v1alpha2"
 
 	"knative.dev/pkg/apis"
+	duckv1 "knative.dev/pkg/apis/duck/v1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -71,6 +74,34 @@ func WithPingSourceUID(uid string) PingSourceOption {
 	}
 }
 
+func WithPingSourceResourceScopeAnnotation(c *v1alpha1.PingSource) {
+	if c.Annotations == nil {
+		c.Annotations = make(map[string]string)
+	}
+	c.Annotations[eventing.ScopeAnnotationKey] = eventing.ScopeResource
+}
+
+func WithPingSourceV1A2ResourceScopeAnnotation(c *v1alpha2.PingSource) {
+	if c.Annotations == nil {
+		c.Annotations = make(map[string]string)
+	}
+	c.Annotations[eventing.ScopeAnnotationKey] = eventing.ScopeResource
+}
+
+func WithPingSourceClusterScopeAnnotation(c *v1alpha1.PingSource) {
+	if c.Annotations == nil {
+		c.Annotations = make(map[string]string)
+	}
+	c.Annotations[eventing.ScopeAnnotationKey] = eventing.ScopeCluster
+}
+
+func WithPingSourceV1A2ClusterScopeAnnotation(c *v1alpha2.PingSource) {
+	if c.Annotations == nil {
+		c.Annotations = make(map[string]string)
+	}
+	c.Annotations[eventing.ScopeAnnotationKey] = eventing.ScopeCluster
+}
+
 // WithInitPingSourceConditions initializes the PingSource's conditions.
 func WithInitPingSourceConditions(s *v1alpha1.PingSource) {
 	s.Status.InitializeConditions()
@@ -112,6 +143,12 @@ func WithPingSourceV1A2Sink(uri *apis.URL) PingSourceV1A2Option {
 	}
 }
 
+func WithPingSourceNotDeployed(name string) PingSourceOption {
+	return func(s *v1alpha1.PingSource) {
+		s.Status.PropagateDeploymentAvailability(NewDeployment(name, "any"))
+	}
+}
+
 func WithPingSourceDeployed(s *v1alpha1.PingSource) {
 	s.Status.PropagateDeploymentAvailability(NewDeployment("any", "any", WithDeploymentAvailable()))
 }
@@ -121,7 +158,10 @@ func WithPingSourceV1A2Deployed(s *v1alpha2.PingSource) {
 }
 
 func WithPingSourceEventType(s *v1alpha1.PingSource) {
-	s.Status.MarkEventType()
+	s.Status.CloudEventAttributes = []duckv1.CloudEventAttributes{{
+		Type:   v1alpha1.PingSourceEventType,
+		Source: v1alpha1.PingSourceSource(s.Namespace, s.Name),
+	}}
 }
 
 func WithPingSourceV1A2EventType(s *v1alpha2.PingSource) {
@@ -169,4 +209,15 @@ func WithPingSourceObjectMetaGeneration(generation int64) PingSourceOption {
 	return func(c *v1alpha1.PingSource) {
 		c.ObjectMeta.Generation = generation
 	}
+}
+
+func WithPingSourceV1A2Finalizers(finalizers ...string) PingSourceV1A2Option {
+	return func(c *v1alpha2.PingSource) {
+		c.Finalizers = finalizers
+	}
+}
+
+func WithPingSourceV1A2Deleted(c *v1alpha2.PingSource) {
+	t := metav1.NewTime(time.Unix(1e9, 0))
+	c.SetDeletionTimestamp(&t)
 }
